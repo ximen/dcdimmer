@@ -1,0 +1,68 @@
+{
+    "device_name": "DCDimmer6",
+    "elements":[
+        {
+            "root": true
+        },{
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server1"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server1"
+                }
+            ]
+        }, {
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server2"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server2"
+                }
+            ]
+        }, {
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server3"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server3"
+                }
+            ]
+        }, {
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server4"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server4"
+                }
+            ]
+        }, {
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server5"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server5"
+                }
+            ]
+        }, {
+            "sig_models": [
+                {
+                    "model": "generic_on_off_server",
+                    "short_name": "onoff_server6"
+                },{
+                    "model": "generic_level_server",
+                    "short_name": "level_server6"
+                }
+            ]
+        }
+    ]
+}

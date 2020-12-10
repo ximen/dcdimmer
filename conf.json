@@ -1,0 +1,65 @@
+{
+	"name": "DCDimmer x6",
+	"short_name": "dcd_config",
+	"version": 1,
+	"topics": [
+		{
+			"name": "WiFi",
+			"std_wifi": true,
+			"default_ssid": "DCD6",
+			"default_psk": ""
+		}, {
+            "name": "Services",
+			"short_name": "services_topic",
+			"elements": [
+				{
+					"name": "MQTT",
+					"short_name": "mqtt_enable",
+					"type": "boolean"
+				}, {
+					"name": "Bluetooth mesh",
+					"short_name": "ble_mesh_enable",
+					"type": "boolean"
+				}]      
+        }, {
+			"name": "MQTT",
+			"std_mqtt": true,
+			"depends_on": "mqtt_enable"
+		}, {
+			"name": "Topics",
+			"short_name": "topics_topic",
+			"depends_on": "mqtt_enable",
+			"elements": [{
+				"name": "Channel 1",
+				"short_name": "topic1_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Channel 2",
+				"short_name": "topic2_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Channel 3",
+				"short_name": "topic3_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Channel 4",
+				"short_name": "topic4_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Channel 5",
+				"short_name": "topic5_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Channel 6",
+				"short_name": "topic6_element",
+				"type": "string",
+				"size": "50"
+			}]
+		}
+    ]
+}
