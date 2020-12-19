@@ -59,6 +59,11 @@
 				"short_name": "topic6_element",
 				"type": "string",
 				"size": "50"
+			}, {
+				"name": "Current consumption",
+				"short_name": "current_element",
+				"type": "string",
+				"size": "50"
 			}]
 		}
     ]
