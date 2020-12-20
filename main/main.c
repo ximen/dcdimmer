@@ -95,13 +95,13 @@ void notify(queue_value_t state){
         if(element){
             esp_ble_mesh_model_t *onoff_model = esp_ble_mesh_find_sig_model(element, ESP_BLE_MESH_MODEL_ID_GEN_ONOFF_SRV);
             esp_ble_mesh_model_t *level_model = esp_ble_mesh_find_sig_model(element, ESP_BLE_MESH_MODEL_ID_GEN_LEVEL_SRV);
-            esp_ble_mesh_server_state_value_t value = {
-                .gen_onoff.onoff = state.state,
-                .gen_level.level = state.state
-            };
-            ESP_LOGI(TAG, "Updating server value. Element: %d", element->element_addr);
-            esp_ble_mesh_server_model_update_state(onoff_model, ESP_BLE_MESH_GENERIC_ONOFF_STATE, &value);
-            esp_ble_mesh_server_model_update_state(level_model, ESP_BLE_MESH_GENERIC_LEVEL_STATE, &value);
+            esp_ble_mesh_server_state_value_t onoff_value;
+            esp_ble_mesh_server_state_value_t level_value;
+            if (state.state) onoff_value.gen_onoff.onoff = 1; else onoff_value.gen_onoff.onoff = 0;
+            level_value.gen_level.level = state.state;
+            ESP_LOGI(TAG, "Updating server value. OnOff %d, Level %d", onoff_value.gen_onoff.onoff, level_value.gen_level.level);
+            esp_ble_mesh_server_model_update_state(onoff_model, ESP_BLE_MESH_GENERIC_ONOFF_STATE, &onoff_value);
+            esp_ble_mesh_server_model_update_state(level_model, ESP_BLE_MESH_GENERIC_LEVEL_STATE, &level_value);
         }
     }
     if (config_mqtt_enable){
@@ -331,7 +331,7 @@ static void worker_task( void *pvParameters ){
         if( xStatus == pdPASS ){
             ESP_LOGI(TAG, "Received from queue: channel=%d, value=%d", item.channel, item.state);
             ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128/100, FADE_TIME_MS);
-            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_NO_WAIT);
+            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_WAIT_DONEf);
             // if (item.state == 0){
             //     gpio_set_level(outputs[item.channel], OFF_LEVEL);
             //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], OFF_LEVEL);
