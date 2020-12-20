@@ -20,6 +20,8 @@
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_generic_model_api.h"
 #include "esp_ble_mesh_local_data_operation_api.h"
+#include "driver/ledc.h"
+#include <stdint.h>
 
 #define TAG "MAIN"
 #define BUTTON_PIN 		GPIO_NUM_0
@@ -33,7 +35,9 @@
 #define TASK_STACK_SIZE 4096
 #define QUEUE_LENGTH    5
 #define ADC_PERIOD_MS   100
+#define FADE_TIME_MS    500
 
+ledc_channel_config_t ledc_channel[CHANNEL_NUMBER];
 uint16_t adc_values[1000/ADC_PERIOD_MS];
 uint16_t adc_counter;
 
@@ -53,8 +57,8 @@ app_config_cbs_t app_cbs;
 xQueueHandle state_queue;
 
 typedef struct {
-    uint8_t channel;
-    uint8_t state;
+    uint8_t channel;        // Channel number. Values over CHACHANNEL_NUMBER are for current sensor
+    uint8_t state;          // New state in percent
 } queue_value_t;
 
 void queue_value(uint8_t channel, uint8_t value){
@@ -88,21 +92,35 @@ void notify(queue_value_t state){
     if (config_mesh_enable) {
         ESP_LOGI(TAG, "BLE Mesh enabled, notifying");
         esp_ble_mesh_elem_t *element = esp_ble_mesh_find_element(esp_ble_mesh_get_primary_element_address() + state.channel + 1);
-        esp_ble_mesh_model_t *model = esp_ble_mesh_find_sig_model(element, ESP_BLE_MESH_MODEL_ID_GEN_ONOFF_SRV);
-        esp_ble_mesh_server_state_value_t value = {.gen_onoff.onoff = state.state};
-        ESP_LOGI(TAG, "Updating server value. Element: %d, Model: %d", element->element_addr, model->model_idx);
-        esp_ble_mesh_server_model_update_state(model, ESP_BLE_MESH_GENERIC_ONOFF_STATE, &value);
+        if(element){
+            esp_ble_mesh_model_t *onoff_model = esp_ble_mesh_find_sig_model(element, ESP_BLE_MESH_MODEL_ID_GEN_ONOFF_SRV);
+            esp_ble_mesh_model_t *level_model = esp_ble_mesh_find_sig_model(element, ESP_BLE_MESH_MODEL_ID_GEN_LEVEL_SRV);
+            esp_ble_mesh_server_state_value_t value = {
+                .gen_onoff.onoff = state.state,
+                .gen_level.level = state.state
+            };
+            ESP_LOGI(TAG, "Updating server value. Element: %d", element->element_addr);
+            esp_ble_mesh_server_model_update_state(onoff_model, ESP_BLE_MESH_GENERIC_ONOFF_STATE, &value);
+            esp_ble_mesh_server_model_update_state(level_model, ESP_BLE_MESH_GENERIC_LEVEL_STATE, &value);
+        }
     }
     if (config_mqtt_enable){
         if(state.channel < CHANNEL_NUMBER){                 // Channel topic
             char *topic = get_mqtt_topic(state.channel);
             char status_topic[58] = {0};
+            char brightness_status_topic[58] = {0};
             strncat(status_topic, topic, 50);
+            strncat(brightness_status_topic, topic, 50);
             strcat(status_topic, "/status");
+            strcat(brightness_status_topic, "/brightness/status");
             if (strlen(topic) > 0){
                 ESP_LOGI(TAG, "Publishing MQTT status. Topic %s, value %d", topic, state.state);
                 if(state.state) app_config_mqtt_publish(status_topic, "ON");
                 else app_config_mqtt_publish(status_topic, "OFF");
+                char brightness_value[4];
+                sprintf(brightness_value, "%3d", state.state);
+                ESP_LOGI(TAG, "Publishing MQTT brightness status. Topic %s, value %s", brightness_status_topic, brightness_value);
+                app_config_mqtt_publish(brightness_status_topic, brightness_value);
             }
             else{
                 ESP_LOGI(TAG,"Topic not specified");
@@ -144,7 +162,8 @@ uint8_t get_channel_number(esp_ble_mesh_model_t *model, esp_ble_mesh_msg_ctx_t *
 } 
 
 static void app_ble_mesh_generic_server_cb(esp_ble_mesh_generic_server_cb_event_t event, esp_ble_mesh_generic_server_cb_param_t *param){
-esp_ble_mesh_gen_onoff_srv_t *srv;
+esp_ble_mesh_gen_onoff_srv_t *onoff_srv;
+esp_ble_mesh_gen_level_srv_t *level_srv;
     ESP_LOGI(TAG, "event 0x%02x, opcode 0x%04x, src 0x%04x, dst 0x%04x",
         event, param->ctx.recv_op, param->ctx.addr, param->ctx.recv_dst);
 
@@ -155,16 +174,24 @@ esp_ble_mesh_gen_onoff_srv_t *srv;
             param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK) {
             ESP_LOGI(TAG, "onoff 0x%02x", param->value.state_change.onoff_set.onoff);
             uint8_t channel = get_channel_number(param->model, &param->ctx);
-            if (channel < CHANNEL_NUMBER) queue_value(channel, param->value.state_change.onoff_set.onoff);
+            if (channel < CHANNEL_NUMBER) queue_value(channel, param->value.state_change.onoff_set.onoff*100);
+        } else if (param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_SET || ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_SET_UNACK){
+            uint8_t channel = get_channel_number(param->model, &param->ctx);
+            uint8_t val = ((param->value.state_change.level_set.level+32767)*100)/65534;
+            ESP_LOGI(TAG, "level %d, ch %d, value %d", param->value.state_change.level_set.level, channel, val);
+            if (channel < CHANNEL_NUMBER) queue_value(channel, val);
         }
         break;
     case ESP_BLE_MESH_GENERIC_SERVER_RECV_GET_MSG_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_GENERIC_SERVER_RECV_GET_MSG_EVT");
         if (param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_GET) {
-            srv = param->model->user_data;
-            ESP_LOGI(TAG, "onoff 0x%02x", srv->state.onoff);
+            onoff_srv = param->model->user_data;
+            ESP_LOGI(TAG, "onoff 0x%02x", onoff_srv->state.onoff);
             uint8_t channel = get_channel_number(param->model, &param->ctx);
             ESP_LOGI(TAG, "Received get, channel %d", channel);
+        } else if (param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_GET) {
+            level_srv = param->model->user_data;
+            ESP_LOGI(TAG, "level %d on channel %d", level_srv->state.level, get_channel_number(param->model, &param->ctx));
         }
         break;
     case ESP_BLE_MESH_GENERIC_SERVER_RECV_SET_MSG_EVT:
@@ -185,6 +212,11 @@ esp_ble_mesh_gen_onoff_srv_t *srv;
     }
 }
 
+uint8_t get_current_value(uint8_t channel){
+    uint32_t duty = ledc_get_duty(LEDC_HIGH_SPEED_MODE, channel);
+    return duty*100/128;        // 7-bit resolution
+}
+
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
@@ -194,9 +226,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             for(uint8_t i=0; i<CHANNEL_NUMBER; i++){
                 char *topic = get_mqtt_topic(i);
+                char brightness_topic[58] = {0};
+                strncat(brightness_topic, topic, 50);
+                strncat(brightness_topic, "/brightness", 50);
                 if(strlen(topic) > 0){
                     ESP_LOGI(TAG, "Subscribing %s", topic);
                     esp_mqtt_client_subscribe(client, topic, 1);
+                    ESP_LOGI(TAG, "Subscribing %s", brightness_topic);
+                    esp_mqtt_client_subscribe(client, brightness_topic, 1);
                 }
             }
             break;
@@ -218,6 +255,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             printf("DATA=%.*s\r\n", event->data_len, event->data);
             for(uint8_t i=0; i < CHANNEL_NUMBER; i++){
                 char *topic = get_mqtt_topic(i);
+                char brightness_topic[58] = {0};
+                strncat(brightness_topic, topic, 50);
+                strncat(brightness_topic, "/brightness", 50);
                 if(strlen(topic) == 0){
                     ESP_LOGI(TAG, "Empty topic %d", i);
                     continue;
@@ -225,7 +265,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 if(strncmp(event->topic, topic, event->topic_len) == 0){
                     if(strncmp(event->data, "ON", event->data_len) == 0){
                         ESP_LOGI(TAG, "Got ON");
-                        queue_value(i, 1);
+                        uint8_t current_value = get_current_value(i);
+                        ESP_LOGI(TAG, "Current value: %d", current_value);
+                        if(current_value == 0){
+                            queue_value(i, 100);
+                        } 
                     } else if (strncmp(event->data, "OFF", event->data_len) == 0){
                             ESP_LOGI(TAG, "Got OFF");
                         queue_value(i, 0);
@@ -233,6 +277,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                         ESP_LOGW(TAG, "Error parsing payload");
                     }
                     break;
+                } else if(strncmp(event->topic, brightness_topic, event->topic_len) == 0){
+                    char val_str[4] = {0};
+                    strncpy(val_str, event->data, (event->data_len > 3)?(3):(event->data_len));
+                    long val = strtol(val_str, NULL, 10);
+                    if(val>100){
+                        ESP_LOGW(TAG, "Wrong brightness value %d", (int)val);
+                        continue;
+                    }
+                    queue_value(i, (uint8_t)val);
                 }
             }
             break;
@@ -277,13 +330,15 @@ static void worker_task( void *pvParameters ){
         portBASE_TYPE xStatus = xQueueReceive(state_queue, &item, portMAX_DELAY );
         if( xStatus == pdPASS ){
             ESP_LOGI(TAG, "Received from queue: channel=%d, value=%d", item.channel, item.state);
-            if (item.state == 0){
-                gpio_set_level(outputs[item.channel], OFF_LEVEL);
-                ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], OFF_LEVEL);
-            } else {
-                gpio_set_level(outputs[item.channel], ON_LEVEL);
-                ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], ON_LEVEL);
-            }
+            ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128/100, FADE_TIME_MS);
+            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_NO_WAIT);
+            // if (item.state == 0){
+            //     gpio_set_level(outputs[item.channel], OFF_LEVEL);
+            //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], OFF_LEVEL);
+            // } else {
+            //     gpio_set_level(outputs[item.channel], ON_LEVEL);
+            //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], ON_LEVEL);
+            // }
                 
             notify(item);
         }
@@ -347,4 +402,23 @@ void app_main(void){
             return;
         }
     }
+
+    ledc_timer_config_t ledc_timer = {
+        .duty_resolution = LEDC_TIMER_7_BIT,  // resolution of PWM duty
+        .freq_hz = 2000,                      // frequency of PWM signal
+        .speed_mode = LEDC_HIGH_SPEED_MODE,   // timer mode
+        .timer_num = LEDC_TIMER_0,            // timer index
+        .clk_cfg = LEDC_AUTO_CLK,             // Auto select the source clock
+    };
+    ledc_timer_config(&ledc_timer);
+    for (uint8_t i=0; i<CHANNEL_NUMBER; i++){
+        ledc_channel[i].channel  = i;
+        ledc_channel[i].duty     = 0,
+        ledc_channel[i].gpio_num = outputs[i];
+        ledc_channel[i].speed_mode = LEDC_HIGH_SPEED_MODE;
+        ledc_channel[i].hpoint = 0;
+        ledc_channel[i].timer_sel = LEDC_TIMER_0;
+        ledc_channel_config(&ledc_channel[i]);
+    }
+    ledc_fade_func_install(0);
 }
