@@ -15,6 +15,7 @@
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/timers.h"
 #include "sdkconfig.h"
 #include <driver/adc.h>
 #include "esp_ble_mesh_networking_api.h"
@@ -36,7 +37,9 @@
 #define QUEUE_LENGTH    5
 #define ADC_PERIOD_MS   100
 #define FADE_TIME_MS    500
+#define RESET_TIME_MS   3000
 
+TimerHandle_t   reset_timer;
 ledc_channel_config_t ledc_channel[CHANNEL_NUMBER];
 uint16_t adc_values[1000/ADC_PERIOD_MS];
 uint16_t adc_counter;
@@ -365,13 +368,20 @@ static void worker_task( void *pvParameters ){
     }
 }
 
-void check_reset_pin(){
-    if (gpio_get_level(BUTTON_PIN) == 0){
-        app_config_erase();
+void reset_timer_cb(TimerHandle_t xTimer){
+    app_config_erase();
+}
+
+static void IRAM_ATTR gpio_isr_handler(void* arg){
+    if (gpio_get_level(BUTTON_PIN == 0)){
+        xTimerStartFromISR(reset_timer, 0);
+    } else {
+        xTimerStopFromISR(reset_timer, 0);
     }
 }
 
 void app_main(void){
+    reset_timer = xTimerCreate("reset_timer", RESET_TIME_MS / portTICK_PERIOD_MS, pdFALSE, NULL, reset_timer_cb);
     for (uint8_t i=0; i<CHANNEL_NUMBER; i++){
         gpio_reset_pin(outputs[i]);
         gpio_intr_disable(outputs[i]);
@@ -399,9 +409,10 @@ void app_main(void){
     gpio_pulldown_dis(BUTTON_PIN);
     gpio_set_level(INA_RESET_PIN, 0);
     gpio_set_level(SHUTDOWN_PIN, 1);
+    gpio_set_intr_type(BUTTON_PIN, GPIO_INTR_ANYEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(BUTTON_PIN, gpio_isr_handler, (void*) NULL);
 
-    check_reset_pin();
-    
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
 
