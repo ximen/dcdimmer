@@ -161,6 +161,20 @@ uint8_t get_channel_number(esp_ble_mesh_model_t *model, esp_ble_mesh_msg_ctx_t *
     return 0xFF;
 } 
 
+static void app_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t event, esp_ble_mesh_cfg_server_cb_param_t *param){
+    if (event == ESP_BLE_MESH_CFG_SERVER_STATE_CHANGE_EVT){
+        switch (param->ctx.recv_op) {
+            case ESP_BLE_MESH_MODEL_OP_NODE_RESET:
+                ESP_LOGW(TAG, "Resetting Ble mesh node!");
+                esp_ble_mesh_node_local_reset();
+                break;
+            default:
+                break;
+        }
+        
+    }
+}
+
 static void app_ble_mesh_generic_server_cb(esp_ble_mesh_generic_server_cb_event_t event, esp_ble_mesh_generic_server_cb_param_t *param){
 esp_ble_mesh_gen_onoff_srv_t *onoff_srv;
 esp_ble_mesh_gen_level_srv_t *level_srv;
@@ -331,7 +345,7 @@ static void worker_task( void *pvParameters ){
         if( xStatus == pdPASS ){
             ESP_LOGI(TAG, "Received from queue: channel=%d, value=%d", item.channel, item.state);
             ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128/100, FADE_TIME_MS);
-            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_WAIT_DONEf);
+            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_WAIT_DONE);
             // if (item.state == 0){
             //     gpio_set_level(outputs[item.channel], OFF_LEVEL);
             //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], OFF_LEVEL);
@@ -378,6 +392,7 @@ void app_main(void){
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
 
+    app_cbs.config_srv = app_ble_mesh_config_server_cb;
     app_cbs.generic_srv = app_ble_mesh_generic_server_cb;
     app_cbs.mqtt = mqtt_event_handler;
     ESP_ERROR_CHECK(app_config_init(&app_cbs));
