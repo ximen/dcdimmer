@@ -364,6 +364,13 @@ static void worker_task( void *pvParameters ){
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
+
+void check_reset_pin(){
+    if (gpio_get_level(BUTTON_PIN) == 0){
+        app_config_erase();
+    }
+}
+
 void app_main(void){
     for (uint8_t i=0; i<CHANNEL_NUMBER; i++){
         gpio_reset_pin(outputs[i]);
@@ -377,18 +384,24 @@ void app_main(void){
     gpio_reset_pin(INA_RESET_PIN);
     gpio_reset_pin(ADC_PIN);
     gpio_reset_pin(SHUTDOWN_PIN);
+    gpio_reset_pin(BUTTON_PIN);
     gpio_set_direction(INA_RESET_PIN, GPIO_MODE_OUTPUT);
     gpio_set_direction(SHUTDOWN_PIN, GPIO_MODE_OUTPUT);
     gpio_set_direction(ADC_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(BUTTON_PIN, GPIO_MODE_INPUT);
+    gpio_pullup_dis(BUTTON_PIN);
     gpio_pullup_dis(INA_RESET_PIN);
     gpio_pulldown_dis(INA_RESET_PIN);
     gpio_pullup_dis(SHUTDOWN_PIN);
     gpio_pulldown_dis(SHUTDOWN_PIN);
     gpio_pullup_dis(ADC_PIN);
     gpio_pulldown_dis(ADC_PIN);
+    gpio_pulldown_dis(BUTTON_PIN);
     gpio_set_level(INA_RESET_PIN, 0);
     gpio_set_level(SHUTDOWN_PIN, 1);
 
+    check_reset_pin();
+    
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
 
