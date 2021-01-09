@@ -65,6 +65,40 @@
 				"type": "string",
 				"size": "50"
 			}]
+		}, {
+			"name": "Brightness",
+			"short_name": "bright_topic",
+			"elements": [{
+				"name": "Brightness limit 1",
+				"short_name": "bright1_element",
+				"type": "int8",
+				"default": 100
+			}, {
+				"name": "Brightness limit 2",
+				"short_name": "bright2_element",
+				"type": "int8",
+				"default": 100
+			}, {
+				"name": "Brightness limit 3",
+				"short_name": "bright3_element",
+				"type": "int8",
+				"default": 100
+			}, {
+				"name": "Brightness limit 4",
+				"short_name": "bright4_element",
+				"type": "int8",
+				"default": 100
+			}, {
+				"name": "Brightness limit 5",
+				"short_name": "bright5_element",
+				"type": "int8",
+				"default": 100
+			}, {
+				"name": "Brightness limit 6",
+				"short_name": "bright6_element",
+				"type": "int8",
+				"default": 100
+			}]
 		}
     ]
 }

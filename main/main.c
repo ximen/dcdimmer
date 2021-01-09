@@ -230,8 +230,12 @@ esp_ble_mesh_gen_level_srv_t *level_srv;
 }
 
 uint8_t get_current_value(uint8_t channel){
+    char element[18];
+    sprintf(element, "bright%d_element", channel + 1);
+    uint8_t max_brightness = 100;
+    app_config_getValue(element, int8, &max_brightness);
     uint32_t duty = ledc_get_duty(LEDC_HIGH_SPEED_MODE, channel);
-    return duty*100/128;        // 7-bit resolution
+    return duty*100*100/(128*max_brightness);        // 7-bit resolution
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
@@ -347,7 +351,11 @@ static void worker_task( void *pvParameters ){
         portBASE_TYPE xStatus = xQueueReceive(state_queue, &item, portMAX_DELAY );
         if( xStatus == pdPASS ){
             ESP_LOGI(TAG, "Received from queue: channel=%d, value=%d", item.channel, item.state);
-            ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128/100, FADE_TIME_MS);
+            char element[18];
+            sprintf(element, "bright%d_element", item.channel + 1);
+            uint8_t max_brightness = 100;
+            app_config_getValue(element, int8, &max_brightness);
+            ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128*max_brightness/(100*100), FADE_TIME_MS);
             ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_WAIT_DONE);
             // if (item.state == 0){
             //     gpio_set_level(outputs[item.channel], OFF_LEVEL);
