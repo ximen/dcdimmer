@@ -120,12 +120,12 @@ void app_mqtt_notify(queue_value_t state){
             strcat(brightness_status_topic, "/brightness/status");
             if (strlen(topic) > 0){
                 ESP_LOGI(TAG, "Publishing MQTT status. Topic %s, value %d", topic, state.state);
-                if(state.state) app_config_mqtt_publish(status_topic, "ON");
-                else app_config_mqtt_publish(status_topic, "OFF");
+                if(state.state) app_config_mqtt_publish(status_topic, "ON", true);
+                else app_config_mqtt_publish(status_topic, "OFF", true);
                 char brightness_value[4];
                 sprintf(brightness_value, "%3d", state.state);
                 ESP_LOGI(TAG, "Publishing MQTT brightness status. Topic %s, value %s", brightness_status_topic, brightness_value);
-                app_config_mqtt_publish(brightness_status_topic, brightness_value);
+                app_config_mqtt_publish(brightness_status_topic, brightness_value, true);
             }
             else{
                 ESP_LOGI(TAG,"Topic not specified");
@@ -137,7 +137,7 @@ void app_mqtt_notify(queue_value_t state){
                 ESP_LOGI(TAG, "Publishing current value %d on topic %s", state.state, current_topic);
                 char current_value[6];
                 sprintf(current_value, "%2.2f", (float)state.state*(16.5/4096));
-                app_config_mqtt_publish(current_topic, current_value);
+                app_config_mqtt_publish(current_topic, current_value, true);
             }
 
         }
