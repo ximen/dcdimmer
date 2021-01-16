@@ -10,6 +10,7 @@
 #define TAG             "APP_MQTT"
 #define AVAIL_TOPIC     "/available"
 #define OFFLINE_MSG     "offline"
+#define ONLINE_MSG      "online"
 #define ALLOC_ERR_STR   "Error allocating buffer!"
 
 char *app_mqtt_get_topic(uint8_t channel){
@@ -23,6 +24,25 @@ char *app_mqtt_get_topic(uint8_t channel){
         return NULL;
     }
     return topic;
+}
+
+void app_mqtt_notify_avail(uint8_t channel, char* msg){
+    char element[17] = {0};
+    sprintf(element, "topic%d_element", channel + 1);
+    char *base_path;
+    app_config_getValue(element, string, &base_path);
+    if(strlen(base_path)){
+        char *avail_topic = calloc(strlen(base_path) + sizeof(AVAIL_TOPIC) + 1, sizeof(char));
+        if (avail_topic) {
+            strncat(avail_topic, base_path, strlen(base_path) + 1);
+            strncat(avail_topic, AVAIL_TOPIC, sizeof(AVAIL_TOPIC) + 1);
+            app_config_mqtt_publish(avail_topic, msg, true);
+        } else {
+            ESP_LOGE(TAG, ALLOC_ERR_STR);
+            free(base_path);
+        }
+        free(avail_topic);
+    }
 }
 
 void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
@@ -43,6 +63,11 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
                     ESP_LOGI(TAG, "Subscribing %s", brightness_topic);
                     esp_mqtt_client_subscribe(client, brightness_topic, 1);
                 }
+                app_mqtt_notify_avail(i, ONLINE_MSG);
+                queue_value_t state;
+                state.channel = i;
+                state.state = app_board_get_level(i);
+                app_mqtt_notify(state);
             }
             break;
         case MQTT_EVENT_DISCONNECTED:
