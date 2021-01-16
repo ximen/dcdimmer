@@ -74,6 +74,7 @@ static void adc_task( void *pvParameters ){
 void app_main(void){
     app_board_init();
 
+    app_mqtt_get_lwt(&app_cbs.lwt.topic, &app_cbs.lwt.msg);
     app_cbs.config_srv = app_ble_mesh_config_server_cb;
     app_cbs.generic_srv = app_ble_mesh_generic_server_cb;
     app_cbs.mqtt = mqtt_event_handler;

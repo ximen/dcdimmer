@@ -7,7 +7,10 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 
-#define TAG     "APP_MQTT"
+#define TAG             "APP_MQTT"
+#define AVAIL_TOPIC     "/available"
+#define OFFLINE_MSG     "offline"
+#define ALLOC_ERR_STR   "Error allocating buffer!"
 
 char *app_mqtt_get_topic(uint8_t channel){
     char *topic;
@@ -142,4 +145,25 @@ void app_mqtt_notify(queue_value_t state){
 
         }
 
+}
+
+void app_mqtt_get_lwt(char **topic, char **msg){
+    for (uint8_t i = 0; i < CHANNEL_NUMBER; i++){
+        char element[17] = {0};
+        sprintf(element, "topic%d_element", i + 1);
+        char *base_path;
+        app_config_getValue(element, string, &base_path);
+        if(strlen(base_path)){
+            char *avail_topic = calloc(strlen(base_path) + sizeof(AVAIL_TOPIC) + 1, sizeof(char));
+            if (avail_topic) {
+                strncat(avail_topic, base_path, strlen(base_path) + 1);
+                strncat(avail_topic, AVAIL_TOPIC, sizeof(AVAIL_TOPIC) + 1);
+                *topic = avail_topic;
+                *msg = OFFLINE_MSG;
+            } else {
+                ESP_LOGE(TAG, ALLOC_ERR_STR);
+                free(base_path);
+            }
+        }
+    }
 }
