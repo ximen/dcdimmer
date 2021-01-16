@@ -115,7 +115,7 @@ void app_board_set_on(uint8_t channel){
     char element[16];
     sprintf(element, "save%d_element", channel + 1);
     bool remember;
-    app_config_getValue(element, bool, &remember);
+    app_config_getValue(element, boolean, &remember);
     if(remember){
         queue_value(channel, last_levels[channel]);
     } else {

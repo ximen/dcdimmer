@@ -76,7 +76,7 @@
 			}, {
 				"name": "Remember level 1",
 				"short_name": "save1_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}, {
 				"name": "Brightness limit 2",
@@ -86,7 +86,7 @@
 			}, {
 				"name": "Remember level 2",
 				"short_name": "save2_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}, {
 				"name": "Brightness limit 3",
@@ -96,7 +96,7 @@
 			}, {
 				"name": "Remember level 3",
 				"short_name": "save3_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}, {
 				"name": "Brightness limit 4",
@@ -106,7 +106,7 @@
 			}, {
 				"name": "Remember level 4",
 				"short_name": "save4_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}, {
 				"name": "Brightness limit 5",
@@ -116,7 +116,7 @@
 			}, {
 				"name": "Remember level 5",
 				"short_name": "save5_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}, {
 				"name": "Brightness limit 6",
@@ -126,7 +126,7 @@
 			}, {
 				"name": "Remember level 6",
 				"short_name": "save6_element",
-				"type": "bool",
+				"type": "boolean",
 				"default": false
 			}]
 		}
