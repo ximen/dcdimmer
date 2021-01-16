@@ -11,6 +11,8 @@
 #define AVAIL_TOPIC     "/available"
 #define OFFLINE_MSG     "offline"
 #define ONLINE_MSG      "online"
+#define ON_MSG          "ON"
+#define OFF_MSG         "OFF"
 #define ALLOC_ERR_STR   "Error allocating buffer!"
 
 char *app_mqtt_get_topic(uint8_t channel){
@@ -96,16 +98,16 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
                     continue;
                 }
                 if(strncmp(event->topic, topic, event->topic_len) == 0){
-                    if(strncmp(event->data, "ON", event->data_len) == 0){
+                    if(strncmp(event->data, ON_MSG, event->data_len) == 0){
                         ESP_LOGI(TAG, "Got ON");
                         uint8_t current_value = app_board_get_level(i);
                         ESP_LOGI(TAG, "Current value: %d", current_value);
                         if(current_value == 0){
-                            queue_value(i, 100);
+                            app_board_set_on(i);
                         } 
-                    } else if (strncmp(event->data, "OFF", event->data_len) == 0){
-                            ESP_LOGI(TAG, "Got OFF");
-                        queue_value(i, 0);
+                    } else if (strncmp(event->data, OFF_MSG, event->data_len) == 0){
+                        ESP_LOGI(TAG, "Got OFF");
+                        app_board_set_off(i);
                     } else {
                         ESP_LOGW(TAG, "Error parsing payload");
                     }

@@ -1,4 +1,5 @@
 #include "app_board.h"
+#include "app_common.h"
 #include "app_config.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
@@ -7,7 +8,6 @@
 #include "freertos/timers.h"
 
 static ledc_channel_config_t ledc_channel[CHANNEL_NUMBER];
-
 static const gpio_num_t outputs[CHANNEL_NUMBER] = {
 		GPIO_NUM_14,
 		GPIO_NUM_15,
@@ -17,6 +17,7 @@ static const gpio_num_t outputs[CHANNEL_NUMBER] = {
 		GPIO_NUM_19,
 };
 static TimerHandle_t   reset_timer;
+uint8_t last_levels[CHANNEL_NUMBER] = {100};
 
 static void IRAM_ATTR gpio_isr_handler(void* arg){
     if (gpio_get_level(BUTTON_PIN == 0)){
@@ -94,6 +95,7 @@ void app_board_set_level(uint8_t channel, uint8_t level){
     app_config_getValue(element, int8, &max_brightness);
     ledc_set_fade_with_time(ledc_channel[channel].speed_mode, ledc_channel[channel].channel, level*128*max_brightness/(100*100), FADE_TIME_MS);
     ledc_fade_start(ledc_channel[channel].speed_mode, ledc_channel[channel].channel, LEDC_FADE_WAIT_DONE);
+    last_levels[channel] = level;
 }
 
 uint8_t app_board_get_level(uint8_t channel){
@@ -107,4 +109,20 @@ uint8_t app_board_get_level(uint8_t channel){
 
 uint16_t app_board_get_adc(){
     return adc1_get_raw(ADC1_CHANNEL_5);
+}
+
+void app_board_set_on(uint8_t channel){
+    char element[16];
+    sprintf(element, "save%d_element", channel + 1);
+    bool remember;
+    app_config_getValue(element, bool, &remember);
+    if(remember){
+        queue_value(channel, last_levels[channel]);
+    } else {
+        queue_value(channel, 100);
+    }
+}
+
+void app_board_set_off(uint8_t channel){
+    queue_value(channel, 0);
 }

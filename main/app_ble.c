@@ -75,7 +75,10 @@ void app_ble_mesh_generic_server_cb(esp_ble_mesh_generic_server_cb_event_t event
             param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK) {
             ESP_LOGI(TAG, "onoff 0x%02x", param->value.state_change.onoff_set.onoff);
             uint8_t channel = get_channel_number(param->model, &param->ctx);
-            if (channel < CHANNEL_NUMBER) queue_value(channel, param->value.state_change.onoff_set.onoff*100);
+            if (channel < CHANNEL_NUMBER){
+                if(param->value.state_change.onoff_set.onoff) app_board_set_on(channel);
+                else app_board_set_off(channel);
+            }
         } else if (param->ctx.recv_op == ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_SET || ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_SET_UNACK){
             uint8_t channel = get_channel_number(param->model, &param->ctx);
             uint8_t val = ((param->value.state_change.level_set.level+32767)*100)/65534;

@@ -16,6 +16,8 @@
 
 void app_board_init();
 void app_board_set_level(uint8_t channel, uint8_t level);
+void app_board_set_on(uint8_t channel);
+void app_board_set_off(uint8_t channel);
 uint8_t app_board_get_level(uint8_t channel);
 uint16_t app_board_get_adc();
 
