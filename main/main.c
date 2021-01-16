@@ -11,49 +11,26 @@
 #include "app_config_ble_mesh.h"
 #include "esp_ble_mesh_generic_model_api.h"
 #include "mqtt_client.h"
-#include "driver/gpio.h"
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/timers.h"
 #include "sdkconfig.h"
-#include <driver/adc.h>
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_generic_model_api.h"
 #include "esp_ble_mesh_local_data_operation_api.h"
-#include "driver/ledc.h"
 #include <stdint.h>
+#include "app_board.h"
 
 #define TAG "MAIN"
-#define BUTTON_PIN 		GPIO_NUM_0
-#define ADC_PIN         GPIO_NUM_33
-#define SHUTDOWN_PIN    GPIO_NUM_26
-#define INA_RESET_PIN   GPIO_NUM_25
-#define CHANNEL_NUMBER  6
-#define ACTIVE_LEVEL 	1
-#define ON_LEVEL		ACTIVE_LEVEL
-#define OFF_LEVEL		!ACTIVE_LEVEL
 #define TASK_STACK_SIZE 4096
 #define QUEUE_LENGTH    5
 #define ADC_PERIOD_MS   100
-#define FADE_TIME_MS    500
-#define RESET_TIME_MS   3000
 
-TimerHandle_t   reset_timer;
-ledc_channel_config_t ledc_channel[CHANNEL_NUMBER];
 uint16_t adc_values[1000/ADC_PERIOD_MS];
 uint16_t adc_counter;
 
 const portTickType xTicksToWait = 1000 / portTICK_RATE_MS;
-
-const gpio_num_t outputs[CHANNEL_NUMBER] = {
-		GPIO_NUM_14,
-		GPIO_NUM_15,
-		GPIO_NUM_16,
-		GPIO_NUM_17,
-		GPIO_NUM_18,
-		GPIO_NUM_19,
-};
 
 app_config_cbs_t app_cbs;
 
@@ -229,15 +206,6 @@ esp_ble_mesh_gen_level_srv_t *level_srv;
     }
 }
 
-uint8_t get_current_value(uint8_t channel){
-    char element[18];
-    sprintf(element, "bright%d_element", channel + 1);
-    uint8_t max_brightness = 100;
-    app_config_getValue(element, int8, &max_brightness);
-    uint32_t duty = ledc_get_duty(LEDC_HIGH_SPEED_MODE, channel);
-    return duty*100*100/(128*max_brightness);        // 7-bit resolution
-}
-
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
@@ -286,7 +254,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 if(strncmp(event->topic, topic, event->topic_len) == 0){
                     if(strncmp(event->data, "ON", event->data_len) == 0){
                         ESP_LOGI(TAG, "Got ON");
-                        uint8_t current_value = get_current_value(i);
+                        uint8_t current_value = app_board_get_level(i);
                         ESP_LOGI(TAG, "Current value: %d", current_value);
                         if(current_value == 0){
                             queue_value(i, 100);
@@ -327,7 +295,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void adc_task( void *pvParameters ){
     for (;;){
-        adc_values[adc_counter++] = adc1_get_raw(ADC1_CHANNEL_5);
+        adc_values[adc_counter++] = app_board_get_adc();
         if(adc_counter == 1000/ADC_PERIOD_MS){
             uint32_t acc = 0;
             for(uint16_t i=0; i<adc_counter; i++){
@@ -351,78 +319,20 @@ static void worker_task( void *pvParameters ){
         portBASE_TYPE xStatus = xQueueReceive(state_queue, &item, portMAX_DELAY );
         if( xStatus == pdPASS ){
             ESP_LOGI(TAG, "Received from queue: channel=%d, value=%d", item.channel, item.state);
-            char element[18];
-            sprintf(element, "bright%d_element", item.channel + 1);
-            uint8_t max_brightness = 100;
-            app_config_getValue(element, int8, &max_brightness);
-            ledc_set_fade_with_time(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, item.state*128*max_brightness/(100*100), FADE_TIME_MS);
-            ledc_fade_start(ledc_channel[item.channel].speed_mode, ledc_channel[item.channel].channel, LEDC_FADE_WAIT_DONE);
-            // if (item.state == 0){
-            //     gpio_set_level(outputs[item.channel], OFF_LEVEL);
-            //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], OFF_LEVEL);
-            // } else {
-            //     gpio_set_level(outputs[item.channel], ON_LEVEL);
-            //     ESP_LOGI(TAG, "Set %d pin to %d", outputs[item.channel], ON_LEVEL);
-            // }
-                
+            app_board_set_level(item.channel, item.state);
             notify(item);
         }
         else {
             ESP_LOGI(TAG, "Queue receive timed out");
         }
-        int val = adc1_get_raw(ADC1_CHANNEL_5);
+        int val = app_board_get_adc();
         ESP_LOGI(TAG, "ADC: %d", val);
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
-void reset_timer_cb(TimerHandle_t xTimer){
-    app_config_erase();
-}
-
-static void IRAM_ATTR gpio_isr_handler(void* arg){
-    if (gpio_get_level(BUTTON_PIN == 0)){
-        xTimerStartFromISR(reset_timer, 0);
-    } else {
-        xTimerStopFromISR(reset_timer, 0);
-    }
-}
-
 void app_main(void){
-    reset_timer = xTimerCreate("reset_timer", RESET_TIME_MS / portTICK_PERIOD_MS, pdFALSE, NULL, reset_timer_cb);
-    for (uint8_t i=0; i<CHANNEL_NUMBER; i++){
-        gpio_reset_pin(outputs[i]);
-        gpio_intr_disable(outputs[i]);
-        gpio_set_direction(outputs[i], GPIO_MODE_OUTPUT);
-        gpio_pullup_dis(outputs[i]);
-        gpio_pulldown_dis(outputs[i]);
-        gpio_set_level(outputs[i], OFF_LEVEL);
-    }
-
-    gpio_reset_pin(INA_RESET_PIN);
-    gpio_reset_pin(ADC_PIN);
-    gpio_reset_pin(SHUTDOWN_PIN);
-    gpio_reset_pin(BUTTON_PIN);
-    gpio_set_direction(INA_RESET_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(SHUTDOWN_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(ADC_PIN, GPIO_MODE_INPUT);
-    gpio_set_direction(BUTTON_PIN, GPIO_MODE_INPUT);
-    gpio_pullup_dis(BUTTON_PIN);
-    gpio_pullup_dis(INA_RESET_PIN);
-    gpio_pulldown_dis(INA_RESET_PIN);
-    gpio_pullup_dis(SHUTDOWN_PIN);
-    gpio_pulldown_dis(SHUTDOWN_PIN);
-    gpio_pullup_dis(ADC_PIN);
-    gpio_pulldown_dis(ADC_PIN);
-    gpio_pulldown_dis(BUTTON_PIN);
-    gpio_set_level(INA_RESET_PIN, 0);
-    gpio_set_level(SHUTDOWN_PIN, 1);
-    gpio_set_intr_type(BUTTON_PIN, GPIO_INTR_ANYEDGE);
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(BUTTON_PIN, gpio_isr_handler, (void*) NULL);
-
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC1_CHANNEL_5,ADC_ATTEN_DB_0);
+    app_board_init();
 
     app_cbs.config_srv = app_ble_mesh_config_server_cb;
     app_cbs.generic_srv = app_ble_mesh_generic_server_cb;
@@ -449,23 +359,4 @@ void app_main(void){
             return;
         }
     }
-
-    ledc_timer_config_t ledc_timer = {
-        .duty_resolution = LEDC_TIMER_7_BIT,  // resolution of PWM duty
-        .freq_hz = 2000,                      // frequency of PWM signal
-        .speed_mode = LEDC_HIGH_SPEED_MODE,   // timer mode
-        .timer_num = LEDC_TIMER_0,            // timer index
-        .clk_cfg = LEDC_AUTO_CLK,             // Auto select the source clock
-    };
-    ledc_timer_config(&ledc_timer);
-    for (uint8_t i=0; i<CHANNEL_NUMBER; i++){
-        ledc_channel[i].channel  = i;
-        ledc_channel[i].duty     = 0,
-        ledc_channel[i].gpio_num = outputs[i];
-        ledc_channel[i].speed_mode = LEDC_HIGH_SPEED_MODE;
-        ledc_channel[i].hpoint = 0;
-        ledc_channel[i].timer_sel = LEDC_TIMER_0;
-        ledc_channel_config(&ledc_channel[i]);
-    }
-    ledc_fade_func_install(0);
 }
