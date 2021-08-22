@@ -112,15 +112,15 @@ uint16_t app_board_get_adc(){
 }
 
 void app_board_set_on(uint8_t channel){
-    char element[16];
-    sprintf(element, "save%d_element", channel + 1);
-    bool remember;
-    app_config_getValue(element, boolean, &remember);
-    if(remember){
-        queue_value(channel, last_levels[channel]);
-    } else {
+    // char element[16];
+    // sprintf(element, "save%d_element", channel + 1);
+    // bool remember;
+    // app_config_getValue(element, boolean, &remember);
+    // if(remember){
+    //     queue_value(channel, last_levels[channel]);
+    // } else {
         queue_value(channel, 100);
-    }
+    //}
 }
 
 void app_board_set_off(uint8_t channel){

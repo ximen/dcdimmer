@@ -1,7 +1,7 @@
 {
 	"name": "DCDimmer x6",
 	"short_name": "dcd_config",
-	"version": 1,
+	"version": 2,
 	"topics": [
 		{
 			"name": "WiFi",
@@ -31,37 +31,42 @@
 			"depends_on": "mqtt_enable",
 			"elements": [{
 				"name": "Channel 1",
-				"short_name": "topic1_element",
+				"short_name": "light1_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Channel 2",
-				"short_name": "topic2_element",
+				"short_name": "light2_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Channel 3",
-				"short_name": "topic3_element",
+				"short_name": "light3_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Channel 4",
-				"short_name": "topic4_element",
+				"short_name": "light4_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Channel 5",
-				"short_name": "topic5_element",
+				"short_name": "light5_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Channel 6",
-				"short_name": "topic6_element",
+				"short_name": "light6_name",
 				"type": "string",
 				"size": "50"
 			}, {
 				"name": "Current consumption",
 				"short_name": "current_element",
+				"type": "string",
+				"size": "50"
+			}, {
+				"name": "Light prefix",
+				"short_name": "light_prefix",
 				"type": "string",
 				"size": "50"
 			}]
@@ -74,60 +79,30 @@
 				"type": "int8",
 				"default": 100
 			}, {
-				"name": "Remember level 1",
-				"short_name": "save1_element",
-				"type": "boolean",
-				"default": false
-			}, {
 				"name": "Brightness limit 2",
 				"short_name": "bright2_element",
 				"type": "int8",
 				"default": 100
-			}, {
-				"name": "Remember level 2",
-				"short_name": "save2_element",
-				"type": "boolean",
-				"default": false
 			}, {
 				"name": "Brightness limit 3",
 				"short_name": "bright3_element",
 				"type": "int8",
 				"default": 100
 			}, {
-				"name": "Remember level 3",
-				"short_name": "save3_element",
-				"type": "boolean",
-				"default": false
-			}, {
 				"name": "Brightness limit 4",
 				"short_name": "bright4_element",
 				"type": "int8",
 				"default": 100
-			}, {
-				"name": "Remember level 4",
-				"short_name": "save4_element",
-				"type": "boolean",
-				"default": false
 			}, {
 				"name": "Brightness limit 5",
 				"short_name": "bright5_element",
 				"type": "int8",
 				"default": 100
 			}, {
-				"name": "Remember level 5",
-				"short_name": "save5_element",
-				"type": "boolean",
-				"default": false
-			}, {
 				"name": "Brightness limit 6",
 				"short_name": "bright6_element",
 				"type": "int8",
 				"default": 100
-			}, {
-				"name": "Remember level 6",
-				"short_name": "save6_element",
-				"type": "boolean",
-				"default": false
 			}]
 		}
     ]
